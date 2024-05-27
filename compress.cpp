@@ -50,14 +50,30 @@ vector<tuple<uint8_t, Pixel>> rleEncode(vector<vector<Pixel>> &grid, bool horizo
 
 }
 
+int calculateRleSize(vector<tuple<uint8_t, Pixel>> &blocksAsRle) {
+    int size = 0;
+    for (auto b : blocksAsRle) {
+        uint8_t numberOfReps = get<0>(b);
+        Pixel symbol = get<1>(b);
+
+        if (numberOfReps < 4 && symbol != RLE_MARKER) {
+            size += numberOfReps;
+        }
+        else {
+            size += 3;
+        }
+    }
+    return size;
+}
+
 int compareCompressions(vector<vector<Pixel>> &originalBlock, vector<tuple<uint8_t, Pixel>> &horizontalRleNoModel, vector<tuple<uint8_t, Pixel>> &horizontalRleWithModel,
                         vector<tuple<uint8_t, Pixel>> &verticalRleNoModel, vector<tuple<uint8_t, Pixel>> &verticalRleWithModel) { 
 
     int originalModelSize = originalBlock.size() * originalBlock[0].size();
-    int horizontalRleNoModelSize = horizontalRleNoModel.size() * 2;
-    int horizontalRleWithModelSize = horizontalRleWithModel.size() * 2;
-    int verticalRleNoModelSize = verticalRleNoModel.size() * 2;
-    int verticalRleWithModelSize = verticalRleWithModel.size() * 2;
+    int horizontalRleNoModelSize = calculateRleSize(horizontalRleNoModel);
+    int horizontalRleWithModelSize = calculateRleSize(horizontalRleWithModel);
+    int verticalRleNoModelSize = calculateRleSize(verticalRleNoModel);
+    int verticalRleWithModelSize = calculateRleSize(verticalRleWithModel);
 
     int sizes[5] = {originalModelSize, horizontalRleNoModelSize, horizontalRleWithModelSize, verticalRleNoModelSize, verticalRleWithModelSize};
     int index = 0;
@@ -160,6 +176,7 @@ vector<vector<Pixel>> applyModel(vector<vector<Pixel>> &block, bool horizontal) 
     vector<vector<Pixel>> blockAfterModel = block;
     Pixel prev = block[0][0];
     if (horizontal) {
+        // Traverse from left to right
         for (size_t i = 0; i < block.size(); i++) {
             for (size_t j = 0; j < block[i].size(); j++) {
                 if (i == 0 && j == 0) {
@@ -172,6 +189,7 @@ vector<vector<Pixel>> applyModel(vector<vector<Pixel>> &block, bool horizontal) 
         }
     }
     else {
+        // Traverse from up to down
         for (size_t i = 0; i < block[0].size(); i++) {
             for (size_t j = 0; j < block.size(); j++) {
                 if (i == 0 && j == 0) {
@@ -222,8 +240,17 @@ unordered_map<Pixel, int> getSymbolFrequencies(vector<BlockInfo> &info) {
         }
         else {
             for (auto t : block.rleForBestOption) {
-                symbolFrequencies[get<0>(t)]++;
-                symbolFrequencies[get<1>(t)]++;
+                uint8_t numOfReps = get<0>(t);
+                Pixel symbol = get<1>(t);
+
+                if (numOfReps < 4 && symbol != RLE_MARKER) {
+                    symbolFrequencies[symbol] += numOfReps;
+                }
+                else {
+                    symbolFrequencies[RLE_MARKER]++;
+                    symbolFrequencies[numOfReps]++;
+                    symbolFrequencies[symbol]++;
+                }
             }
         }
     }
@@ -400,12 +427,22 @@ void writeData(vector<BlockInfo> &info, unordered_map<Pixel, string> &canonicalH
     for (auto b : info) {
         if (b.compressed) {
             for (auto x : b.rleForBestOption) {
-                string x1 = canonicalHuffman[get<0>(x)];
-                string x2 = canonicalHuffman[get<1>(x)];
+                uint8_t numOfReps = get<0>(x);
+                Pixel symbol = get<1>(x);
+                string numOfRepsCode = canonicalHuffman[numOfReps];
+                string symbolCode = canonicalHuffman[symbol];
+                string rleMarkerCode = canonicalHuffman[RLE_MARKER];
 
-                writeStringToFile(x1, fp, bitsUsed, byteToWrite);
-                writeStringToFile(x2, fp, bitsUsed, byteToWrite);
-                
+                if (numOfReps < 4 && symbol != RLE_MARKER) {
+                    for (int i = 0; i < numOfReps; i++) {
+                        writeStringToFile(symbolCode, fp, bitsUsed, byteToWrite);
+                    }
+                }
+                else {
+                    writeStringToFile(rleMarkerCode, fp, bitsUsed, byteToWrite);
+                    writeStringToFile(numOfRepsCode, fp, bitsUsed, byteToWrite);
+                    writeStringToFile(symbolCode, fp, bitsUsed, byteToWrite);
+                }
             }
         }
         else {

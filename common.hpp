@@ -17,6 +17,7 @@ using namespace std;
 typedef int16_t Pixel;
 
 #define BLOCK_SIZE 16
+#define RLE_MARKER 100
 
 enum compressMode {COMPRESS, DECOMPRESS};
 

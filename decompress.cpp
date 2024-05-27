@@ -89,9 +89,15 @@ void getDataForOneBlock(vector<BlockInfo> &blockInfoDecompress, unordered_map<st
     // Unwrap RLE format to normal format
     if (blockInfoDecompress[0].compressed) {
         vector<Pixel> newBlock = {};
-        for (size_t i = 1; i < imageData.size(); i += 2) {
-            for (int j = 0; j < imageData[i-1]; j++) {
+        for (size_t i = 0; i < imageData.size(); i++) {
+            if (imageData[i] != RLE_MARKER) {
                 newBlock.push_back(imageData[i]);
+            }
+            else {
+                for (int j = 0; j < imageData[i+1]; j++) {
+                    newBlock.push_back(imageData[i+2]);
+                }
+                i += 2;
             }
         }
         imageData = newBlock;
@@ -129,13 +135,19 @@ void getDataForMultipleBlocks(vector<BlockInfo> &blockInfoDecompress, unordered_
         // If RLE is used
         if (blockInfoDecompress[i].compressed) {
             while (rleCounter < 256) {
-                int reps = imageData[symbolCounter];
-                rleCounter += reps;
-                symbolCounter++;
-                for (int j = 0; j < reps; j++) {
-                    modifiedImageData.push_back(imageData[symbolCounter]);
+                if (imageData[symbolCounter] != RLE_MARKER) {
+                    modifiedImageData.push_back(imageData[symbolCounter++]);
+                    rleCounter++;
                 }
-                symbolCounter++;
+                else {
+                    symbolCounter++;
+                    int reps = imageData[symbolCounter++];
+                    for (int j = 0; j < reps; j++) {
+                        modifiedImageData.push_back(imageData[symbolCounter]);
+                    }
+                    symbolCounter++;
+                    rleCounter += reps;
+                }
             }
         }
         else {
